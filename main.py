@@ -5,9 +5,9 @@ import os
 
 # Define las dimensiones de la pantalla y el tamaño de las cartas
 ANCHO = 2000
-ALTO = 1000
+ALTO = 1200
 CARTA_ANCHO = 300
-CARTA_ALTO = 300
+CARTA_ALTO = 180
 FPS = 50
 GAP = 20
 # Define los colores
@@ -573,7 +573,7 @@ def jugar_kahoot():
     tiempo_restante = tiempo_pregunta
 
     pregunta_texto = pygame_gui.elements.UILabel(
-        relative_rect=pygame.Rect((50, 50), (700, 100)),
+        relative_rect=pygame.Rect((650, 50), (700, 500)),
         text='',
         manager=manager,
 
@@ -656,18 +656,18 @@ def mostrar_pregunta_y_respuestas(ventana, manager, pregunta_actual, pregunta_te
     ventana.blit(fondo_texto, (50, 50))  # Blit del fondo negro detrás del texto
 
     pregunta_texto.set_text(pregunta_actual['pregunta'])
-    pregunta_texto.relative_rect = pygame.Rect((50, 50), (700, 100))
+    pregunta_texto.relative_rect = pygame.Rect((100, 100), (700, 200))
     pregunta_texto.bg_color = NEGRO  # Cambia el color del fondo del texto a negro
     pregunta_texto.bg_alpha = 0  # Establece la opacidad del fondo del texto a 0
 
     respuestas_botones = []
-    y_pos = 200
+    y_pos = 400
     respuesta_correcta = pregunta_actual['correcta']
     for respuesta in pregunta_actual['respuestas']:
         color = BLANCO  # Color predeterminado para las respuestas incorrectas
         if respuesta == respuesta_correcta:
             color = VERDE  # Cambia el color a verde si es la respuesta correcta
-        boton_respuesta = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((100, y_pos), (600, 50)),
+        boton_respuesta = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((700, y_pos), (600, 50)),
                                                        text=respuesta,
                                                        manager=manager)
         boton_respuesta.bg_color = color  # Establece el color de fondo del botón
