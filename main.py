@@ -1,13 +1,14 @@
-import pygame
+
 import pygame_gui
 import random
 import os
-
+import pygame
 # Define las dimensiones de la pantalla y el tamaño de las cartas
-ANCHO = 2000
-ALTO = 1200
-CARTA_ANCHO = 300
-CARTA_ALTO = 180
+ANCHO = 1300
+ALTO = 700
+SCREEN_SIZE = (ANCHO, ALTO)
+CARTA_ANCHO = 250
+CARTA_ALTO = 100
 FPS = 50
 GAP = 20
 # Define los colores
@@ -16,7 +17,16 @@ NEGRO = (0, 0, 0)
 AZUL = (0, 0, 255)
 VERDE = (0, 255, 0)
 ROJO = (255, 0, 0)
+# Define la información de los niveles
+niveles = [
+    {'nombre': 'Fácil', 'cartas': 4, 'tiempo': 60},
+    {'nombre': 'Medio', 'cartas': 8, 'tiempo': 45},
+    {'nombre': 'Difícil', 'cartas': 20, 'tiempo': 30}
+]
 
+# Selecciona el nivel actual (empezamos en el nivel 0)
+nivel_actual = 0
+todos_los_niveles_completados = False
 # Define las imágenes
 IMAGENES = ['imagen1.png', 'imagen2.png', 'imagen3.png', 'imagen4.png', 'imagen5.png', 'imagen6.png','imagen7.png', 'imagen8.png', 'imagen9.png', 'imagen10.png', 'imagen11.png', 'imagen12.png']
 
@@ -116,6 +126,7 @@ tablero = []
 x_pos = 100
 y_pos = 100
 for imagen in cartas:
+
     carta = Carta(imagen, x_pos, y_pos)
     tablero.append(carta)
     x_pos += CARTA_ANCHO + GAP  # Añade el espacio entre cartas
@@ -126,96 +137,255 @@ for imagen in cartas:
 
 def abrir_pantalla_en_blanco():
     os.system("start \"\" blank.html")
+def crear_nivel_10_cartas():
+    # Selecciona 5 imágenes diferentes para el nuevo nivel
+    imagenes_seleccionadas = random.sample(imagenes_cargadas, 5)
+    # Duplica cada imagen para formar pares de tarjetas idénticas
+    cartas = imagenes_seleccionadas * 2  # Duplica cada imagen
+    random.shuffle(cartas)
+    # Crea las cartas
+    tablero.clear()  # Limpiar el tablero antes de añadir nuevas cartas
+    x_pos = 100
+    y_pos = 100
+    for imagen in cartas:  # Utiliza todas las imágenes seleccionadas
+        carta = Carta(imagen, x_pos, y_pos)
+        tablero.append(carta)
+        x_pos += CARTA_ANCHO + GAP  # Añade el espacio entre cartas
+        if x_pos >= ANCHO - CARTA_ANCHO:
+            x_pos = 100
+            y_pos += CARTA_ALTO + GAP
+
+
+def avanzar_nivel():
+
+    global nivel_actual, nivel_label
+    nivel_actual += 1
+    nivel_label.set_text(f"Nivel: {nivel_actual}")
+
+
+def show_perdiste_screen():
+    # Inicializar la pantalla
+    screen = pygame.display.set_mode(SCREEN_SIZE)
+    pygame.display.set_caption("¡Perdiste!")
+
+    # Inicializar el administrador de GUI de pygame_gui
+    gui_manager = pygame_gui.UIManager(SCREEN_SIZE)
+    # Cargar la imagen de fondo
+    background_image = pygame.image.load("gameOver.jpeg").convert()  # Cambia "gameOver.jpg" por la ruta de tu imagen
+
+    # Escalar la imagen de fondo para que se ajuste a la pantalla
+    background_image = pygame.transform.scale(background_image, SCREEN_SIZE)
+
+    # Crear un botón para volver a la pantalla principal
+    button_rect = pygame.Rect(550, 100, 200, 50)
+    return_button = pygame_gui.elements.UIButton(relative_rect=button_rect,
+                                                 text='Volver a la pantalla principal',
+                                                 manager=gui_manager)
+
+    # Bucle principal
+    clock = pygame.time.Clock()
+    running = True
+    while running:
+        # Manejo de eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == return_button:
+                        # Aquí puedes agregar la lógica para volver a la pantalla principal
+
+                        running = False  # Para salir del bucle y volver a la pantalla principal
+                        pantalla_principal()
+            gui_manager.process_events(event)
+
+        gui_manager.update(clock.tick(60) / 1000.0)
+
+        # Dibujar la imagen de fondo en la pantalla
+        screen.blit(background_image, (0, 0))
+
+        # Dibujar la interfaz gráfica de usuario
+        gui_manager.draw_ui(screen)
+
+        # Actualizar la pantalla
+        pygame.display.flip()
 
 
 # Define la función principal del juego
 def main():
-    # Registra el tiempo inicial
-    tiempo_inicial = pygame.time.get_ticks()
+    global nivel_actual, terminado, nivel_label
 
-    # Define la interfaz de usuario
-    manager = pygame_gui.UIManager((ANCHO, ALTO))
+    terminado = False  # Inicializa terminado aquí
+    nivel_label = None
 
-    boton_reiniciar = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((ANCHO // 2 - 150, 10), (200, 30)),
-                                                   text='Reiniciar Juego',
-                                                   manager=manager)
-
-    boton_reiniciar_todo = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((ANCHO // 2 + 50, 10), (200, 30)),
-                                                        text='Ir a menú',
-                                                        manager=manager)
-
-    # Crea la etiqueta de tiempo una vez fuera del bucle principal
-    cronometro_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((ANCHO // 2 - 50, 20), (200, 50)),
-                                                   text='',
-                                                   manager=manager)
-
-    carta_seleccionada = None
-    carta_seleccionada2 = None
-    puntuacion = 0
-    intentos = 0
-    terminado = False
-    # Definir un contenedor para el contenido desplazable
-    scrollable_panel_rect = pygame.Rect(100, 100, 400, 400)
+    fondo = pygame.image.load("fondo_memo.jpeg")
+    fondo = pygame.transform.scale(fondo, (ANCHO, ALTO))
 
     while not terminado:
-        # Calcula el tiempo transcurrido desde el inicio del juego
-        tiempo_transcurrido = pygame.time.get_ticks() - tiempo_inicial
-        tiempo_transcurrido_segundos = tiempo_transcurrido // 1000
+        # Inicializa el nivel actual
+        nivel_info = niveles[nivel_actual]
+        num_cartas = nivel_info['cartas']
+        tiempo_limite = nivel_info['tiempo']
 
-        for event in pygame.event.get():
-            manager.process_events(event)
+        # Si es el nivel 1, selecciona solo 4 imágenes
+        if nivel_actual == 0:
 
-            if event.type == pygame.QUIT:
+            imagenes_seleccionadas = random.sample(imagenes_cargadas, num_cartas // 2)
+            cartas = imagenes_seleccionadas + imagenes_seleccionadas
+
+        elif nivel_actual == 1:
+            nivel_label.set_text("Nivel : 1")
+
+            imagenes_seleccionadas = random.sample(imagenes_cargadas, num_cartas // 2)
+            cartas = imagenes_seleccionadas + imagenes_seleccionadas
+
+        elif nivel_actual == 2:
+            nivel_label.set_text("Nivel : 2")
+            imagenes_seleccionadas = random.sample(imagenes_cargadas, num_cartas // 2)
+            cartas = imagenes_seleccionadas + imagenes_seleccionadas
+
+        # Crea las cartas
+        tablero.clear()  # Limpiar el tablero antes de añadir nuevas cartas
+        x_pos = 100
+        y_pos = 100
+        for imagen in cartas[:num_cartas]:  # Usar solo las primeras "num_cartas" imágenes
+            carta = Carta(imagen, x_pos, y_pos)
+            tablero.append(carta)
+            x_pos += CARTA_ANCHO + GAP  # Añade el espacio entre cartas
+            if x_pos >= ANCHO - CARTA_ANCHO:
+                x_pos = 100
+                y_pos += CARTA_ALTO + GAP
+
+        # Restablece el juego para el nuevo nivel
+
+
+        # Registra el tiempo inicial
+        tiempo_inicial = pygame.time.get_ticks() + 60000
+
+        # Restablece la puntuación y los intentos
+        puntuacion = 0
+        intentos = 0
+
+        # Define la interfaz de usuario
+        manager = pygame_gui.UIManager((ANCHO, ALTO))
+        nivel_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((ANCHO // 2 - 50, 20), (200, 100)),
+                                                  text=f'Nivel: {nivel_actual.__str__()}',
+                                                  manager=manager)
+        boton_reiniciar = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((ANCHO // 2 - 150, 10), (200, 30)),
+                                                       text='Reiniciar Juego',
+                                                       manager=manager)
+
+        boton_reiniciar_todo = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((ANCHO // 2 + 50, 10), (200, 30)),
+                                                            text='Ir a menú',
+                                                            manager=manager)
+
+        # Crea la etiqueta de tiempo una vez fuera del bucle principal
+        cronometro_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((ANCHO // 2 - 50, 20), (200, 50)),
+                                                       text='',
+                                                       manager=manager)
+        # Crea la etiqueta de tiempo una vez fuera del bucle principal
+        nivel_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((ANCHO // 2 - 50, 20), (200, 70)),
+                                                       text='',
+                                                       manager=manager)
+
+        carta_seleccionada = None
+        carta_seleccionada2 = None
+        puntuacion = 0
+        intentos = 0
+        terminado = False
+        # Definir un contenedor para el contenido desplazable
+        scrollable_panel_rect = pygame.Rect(100, 100, 400, 400)
+
+        while not terminado:
+
+            # Calcula el tiempo transcurrido desde el inicio del juego
+
+            tiempo_transcurrido = max(0, (tiempo_inicial - pygame.time.get_ticks()) // 1000)
+
+            if tiempo_transcurrido <= 0:
                 terminado = True
-            if event.type == pygame.USEREVENT:
-                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                show_perdiste_screen()
+            for event in pygame.event.get():
+                manager.process_events(event)
 
-                    if event.ui_element == boton_reiniciar:
-                        reiniciar_juego()
-                    if event.ui_element == boton_reiniciar_todo:
-                        reiniciar_todo()
+                if event.type == pygame.QUIT:
+                    terminado = True
+                if event.type == pygame.USEREVENT:
+                    if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                        if event.ui_element == boton_reiniciar:
+                            reiniciar_juego()
+                        if event.ui_element == boton_reiniciar_todo:
+                            reiniciar_todo()
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                for carta in tablero:
-                    if carta.rect.collidepoint(event.pos) and not carta.visible and not carta.matched:
-                        carta.visible = True
-                        if carta_seleccionada is None:
-                            carta_seleccionada = carta
-                        else:
-                            carta_seleccionada2 = carta
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    for carta in tablero:
+                        if carta.rect.collidepoint(event.pos) and not carta.visible and not carta.matched:
+                            carta.visible = True
+                            if carta_seleccionada is None:
+                                carta_seleccionada = carta
+                            else:
+                                carta_seleccionada2 = carta
 
-        ventana.fill(NEGRO)
+            ventana.blit(fondo, (0, 0))
 
-        for carta in tablero:
-            carta.draw()
+            for carta in tablero:
+                carta.draw()
 
-        # Actualiza el texto de la etiqueta de tiempo en cada iteración del bucle
-        cronometro_texto = 'Tiempo: {} seg'.format(tiempo_transcurrido_segundos)
-        cronometro_label.set_text(cronometro_texto)
+            # Actualiza el texto de la etiqueta de tiempo en cada iteración del bucle
+            cronometro_texto = 'Tiempo: {} seg'.format(tiempo_transcurrido)
+            cronometro_label.set_text(cronometro_texto)
 
-        manager.update(0)
-        manager.draw_ui(ventana)
+            manager.update(0)
+            manager.draw_ui(ventana)
 
-        pygame.display.flip()
+            pygame.display.flip()
 
-        if carta_seleccionada and carta_seleccionada2:
-            pygame.time.wait(500)
-            if carta_seleccionada.imagen == carta_seleccionada2.imagen:
-                carta_seleccionada.matched = True
-                carta_seleccionada2.matched = True
-                puntuacion += 1
-            else:
-                carta_seleccionada.visible = False
-                carta_seleccionada2.visible = False
-            carta_seleccionada = None
-            carta_seleccionada2 = None
-            intentos += 1
+            # Comprobar si se han completado todas las cartas
+            if carta_seleccionada and carta_seleccionada2:
+                pygame.time.wait(500)
+                if carta_seleccionada.imagen == carta_seleccionada2.imagen:
+                    carta_seleccionada.matched = True
+                    carta_seleccionada2.matched = True
+                    puntuacion += 1
+                else:
+                    carta_seleccionada.visible = False
+                    carta_seleccionada2.visible = False
+                carta_seleccionada = None
+                carta_seleccionada2 = None
+                intentos += 1
 
-        if puntuacion == len(cartas) / 2:
-            terminado = True
-            pantalla_felicidades()
+            if puntuacion == len(tablero) / 2:
+                if nivel_actual < len(niveles) - 1:  # Verifica si no es el último nivel
+                    print("avanza desde main")
+                    avanzar_nivel()  # Llama a la función avanzar_nivel()
+                    break  # Sale del bucle interno para iniciar el siguiente nivel
+                else:
+                    # Si se completan todos los niveles, muestra la pantalla de felicitaciones
+                    pantalla_felicidades(puntuacion,cronometro_texto)
+                    terminado = True
 
     pygame.quit()
+
+def crear_nivel_6_cartas():
+    print("6cartas ")
+    # Selecciona 3 imágenes diferentes para el nuevo nivel
+    imagenes_seleccionadas = random.sample(imagenes_cargadas, 3)
+    # Duplica cada imagen para formar pares de tarjetas idénticas
+    cartas = imagenes_seleccionadas * 2  # Duplica cada imagen
+    random.shuffle(cartas)
+    # Crea las cartas
+    tablero.clear()  # Limpiar el tablero antes de añadir nuevas cartas
+    x_pos = 100
+    y_pos = 100
+    for imagen in cartas:  # Utiliza todas las imágenes seleccionadas
+        carta = Carta(imagen, x_pos, y_pos)
+        tablero.append(carta)
+        x_pos += CARTA_ANCHO + GAP  # Añade el espacio entre cartas
+        if x_pos >= ANCHO - CARTA_ANCHO:
+            x_pos = 100
+            y_pos += CARTA_ALTO + GAP
+
+
 
 
 # Define la función para la pantalla principal
@@ -247,6 +417,11 @@ def pantalla_principal():
         text='Preguntas',
         manager=manager)
 
+    boton_jugar_con_Imagenes = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect((ANCHO // 2 - 100, ALTO // 2 + 200), (200, 50)),
+        text='Ejercicios',
+        manager=manager)
+
 
 
     running = True
@@ -265,6 +440,9 @@ def pantalla_principal():
                 if event.ui_element == boton_jugar_kahoot and event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     running = False
                     jugar_kahoot()
+                if event.ui_element == boton_jugar_con_Imagenes and event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                     running = False
+                     jugar_juego_con_imagenes()
 
 
 
@@ -276,7 +454,7 @@ def pantalla_principal():
 
 
 # Define la función para la pantalla de felicitaciones
-def pantalla_felicidades():
+def pantalla_felicidades(puntuacion,tiempo):
     pygame.init()
     pygame.mixer.init()
     ventana = pygame.display.set_mode((ANCHO, ALTO))
@@ -293,6 +471,14 @@ def pantalla_felicidades():
         relative_rect=pygame.Rect((ANCHO // 2 - 150, ALTO // 2 - 100), (300, 200)),
         text='¡Felicidades!',
         manager=manager)
+    texto_Tiempo = pygame_gui.elements.UILabel(
+        relative_rect=pygame.Rect((ANCHO // 2 - 150, ALTO // 2 - 100), (300, 250)),
+        text=f'Tu tiempo fue {tiempo}',
+        manager=manager)
+    texto_Puntos= pygame_gui.elements.UILabel(
+        relative_rect=pygame.Rect((ANCHO // 2 - 150, ALTO // 2 - 100), (300, 300)),
+        text=f'Tu puntuacion fue {puntuacion}',
+        manager=manager)
     fondo_texto = pygame.Surface((texto_felicidades.rect.width, texto_felicidades.rect.height))
     fondo_texto.set_alpha(200)  # Ajusta la opacidad (0 transparente, 255 opaco)
     fondo_texto.fill(NEGRO)
@@ -303,7 +489,7 @@ def pantalla_felicidades():
 
     # Crea una etiqueta de botón para jugar de nuevo
     boton_jugar_de_nuevo = pygame_gui.elements.UIButton(
-        relative_rect=pygame.Rect((ANCHO // 2 - 100, ALTO // 2 + 50), (200, 50)),
+        relative_rect=pygame.Rect((ANCHO // 2 - 100, ALTO // 2 + 50), (200, 100)),
         text='Jugar de Nuevo',
         manager=manager)
 
@@ -431,7 +617,6 @@ def pantalla_felicidades3():
         manager.update(time_delta)
         manager.draw_ui(ventana)
         pygame.display.flip()
-
     pygame.quit()
 
 
@@ -444,6 +629,10 @@ def jugar_juego_con_imagenes():
     # Inicializar pygame_gui
     gestor = pygame_gui.UIManager((ANCHO, ALTO))
 
+    # Cargar la imagen de fondo
+    fondo = pygame.image.load("fondo_ejercicios.jpeg")
+    fondo = pygame.transform.scale(fondo, (ANCHO, ALTO))
+
     # Cargar preguntas, imágenes y respuestas
     preguntas_respuestas_imagenes = cargar_imagenes_y_respuestas()
 
@@ -452,37 +641,46 @@ def jugar_juego_con_imagenes():
     pregunta_actual = None
     botones_respuesta = []  # Lista para almacenar los botones de respuesta
 
-    # Cargar la imagen
-    ruta_imagen = os.path.join(preguntas_respuestas_imagenes[0]['imagen'])
-    print("Ruta de la imagen:", ruta_imagen)  # Imprimir la ruta de la imagen
-    imagen = pygame.image.load(ruta_imagen)
-    if imagen is None:
-        print("Error: No se pudo cargar la imagen.")
-        pygame.quit()
+    # Inicializar cronómetro
+    fps = 1000  # Fotogramas por segundo
+    duracion_cronometro_segundos = 3200  # Duración del cronómetro en segundos
+    duracion_total_fotogramas = fps * duracion_cronometro_segundos
 
-    # Escalar la imagen
-    imagen = pygame.transform.scale(imagen, (100, 100))
-    ancho_imagen, alto_imagen = imagen.get_size()
-    print("Tamaño de la imagen:", ancho_imagen, "x", alto_imagen)  # Imprimir el tamaño de la imagen
 
-    pos_x = (ANCHO - ancho_imagen) // 2
-    pos_y = (ALTO - alto_imagen) // 2
-    print("Posición de la imagen:", pos_x, ",", pos_y)  # Imprimir la posición de la imagen
+    cronometro_label = pygame_gui.elements.UILabel(
+        #x y |
+        relative_rect=pygame.Rect((20, 20), (200, 100)),
+        text=f"Cronómetro: {duracion_total_fotogramas}",
+        manager=gestor
+    )
 
-    # Mostrar la imagen en la ventana
-    ventana.blit(imagen, (pos_x, pos_y))
-
-    # Actualizar la pantalla
-    pygame.display.flip()
-
+    # Botón para regresar al menú principal
+    boton_menu_principal = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect((ANCHO - 200, 10), (180, 30)),
+        text="Menú Principal",
+        manager=gestor
+    )
+    frame_count = 0
     while ejecutando:
+        frame_count += 1
+        tiempo_restante_segundos = max(0, duracion_total_fotogramas - frame_count) // fps
+        cronometro_label.set_text(f"Cronómetro: {tiempo_restante_segundos}")
+        # Dibujar la imagen de fondo en la ventana
+        ventana.blit(fondo, (0, 0))
+
+        if tiempo_restante_segundos <= 0:
+            show_perdiste_screen()
 
         # Seleccionar una pregunta al azar si no hay una pregunta actual
         if pregunta_actual is None:
             if preguntas_respuestas_imagenes:
                 pregunta_actual = random.choice(preguntas_respuestas_imagenes)
                 preguntas_respuestas_imagenes.remove(pregunta_actual)
-                mostrar_pregunta(ventana, gestor, pregunta_actual, botones_respuesta)
+                ruta_imagen = mostrar_pregunta(ventana, gestor, pregunta_actual, botones_respuesta)
+                imagen = pygame.image.load(ruta_imagen)
+                imagen = pygame.transform.scale(imagen, (400, 200))
+                pos_x = (ANCHO - imagen.get_width()) // 2
+                pos_y = (ALTO - imagen.get_height()) // 3.5
             else:
                 # Si no quedan más preguntas, mostrar pantalla de felicitaciones y salir del bucle
                 pantalla_felicidades3()
@@ -498,36 +696,72 @@ def jugar_juego_con_imagenes():
                 if evento.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     # Verificar si la opción seleccionada es la correcta
                     respuesta_seleccionada = evento.ui_element.text
+                    if evento.ui_element == boton_menu_principal:
+                        pantalla_principal()
+
                     if respuesta_seleccionada == pregunta_actual['correcta']:
-                        # Si la respuesta es correcta, limpiar la pantalla y pasar a la siguiente pregunta
-                        pregunta_actual = None
-                        ventana.fill((255, 255, 255))
-                        for boton in botones_respuesta:
-                            boton.kill()  # Eliminar los botones de respuesta
-                        botones_respuesta.clear()  # Limpiar la lista de botones
+                        # Cambiar la ruta de la imagen
+                        if len(preguntas_respuestas_imagenes) > 0:
+                            pregunta_actual = None
+                            ventana.fill((255, 255, 255))
+                            for boton in botones_respuesta:
+                                boton.kill()  # Eliminar los botones de respuesta
+                            botones_respuesta.clear()  # Limpiar la lista de botones
+                        else:
+                            # Si no quedan más preguntas, mostrar pantalla de felicitaciones y salir del bucle
+                            pantalla_felicidades3()
+                            ejecutando = False
                     else:
                         print("Respuesta incorrecta")
 
-        ventana.fill((255, 255, 255))  # Rellenar la ventana con blanco
         gestor.update(0)  # Actualizar el gestor de eventos
         gestor.draw_ui(ventana)  # Dibujar los elementos de pygame_gui en la ventana
+        # Mostrar la imagen en la ventana
+        ventana.blit(imagen, (pos_x, pos_y))
         pygame.display.flip()  # Actualizar la ventana
 
-    pygame.quit()  # Cerrar pygame
+    pygame.quit()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def cargar_imagenes_y_respuestas():
     # Aquí defines tus preguntas, imágenes y respuestas
     preguntas_respuestas_imagenes = [
         {
-            'imagen': 'imagen1.png',
-            'respuestas': ['Newton', 'Larangue', 'Luis', 'Juan'],
-            'correcta': 'Newton'
+            'imagen': 'img1.png',
+            'respuestas': ['1.46', '0.3412', '0.72', '-0657813'],
+            'correcta': '-0657813'
         },
         {
-            'imagen': 'imagen4.png',
-            'respuestas': ['interpolacion', 'Matriz', 'numeros', 'nada'],
-            'correcta': 'interpolacion'
+            'imagen': 'img2.png',
+            'respuestas': ['42', '1.1', '0.555555', '0.666666666667'],
+            'correcta': '0.666666666667'
+        },
+        {
+            'imagen': 'img3.png',
+            'respuestas': ['1.10', '-1.029183673', '1.4', '1.029183673'],
+            'correcta': '1.029183673'
+        },
+        {
+            'imagen': 'img4.png',
+            'respuestas': ['2.47822', '1.033234', '1.368808108', '1.4'],
+            'correcta': '1.368808108'
+        },
+        {
+            'imagen': 'img5.png',
+            'respuestas': ['0.47822', '0.5671407819', '0.45114', '0.573896'],
+            'correcta': '0.5671407819'
         },
         # Agrega más preguntas con sus respectivas imágenes y respuestas aquí
     ]
@@ -536,7 +770,7 @@ def cargar_imagenes_y_respuestas():
 
 def mostrar_pregunta(ventana, gestor, pregunta_actual, botones_respuesta):
     # Cargar la imagen de la pregunta
-
+    ruta_imagen = pregunta_actual['imagen']
     # Mostrar las opciones de respuesta
     y_pos = 350
     for respuesta in pregunta_actual['respuestas']:
@@ -550,6 +784,7 @@ def mostrar_pregunta(ventana, gestor, pregunta_actual, botones_respuesta):
 
     # Actualizar la ventana
     pygame.display.flip()
+    return ruta_imagen
 
 
 def jugar_kahoot():
@@ -569,11 +804,11 @@ def jugar_kahoot():
 
     pregunta_actual = None
     respuestas_botones = None
-    tiempo_pregunta = 15  # Tiempo límite para responder cada pregunta en segundos
+    tiempo_pregunta = 25  # Tiempo límite para responder cada pregunta en segundos
     tiempo_restante = tiempo_pregunta
 
     pregunta_texto = pygame_gui.elements.UILabel(
-        relative_rect=pygame.Rect((650, 50), (700, 500)),
+        relative_rect=pygame.Rect((380, 50), (700, 500)),
         text='',
         manager=manager,
 
@@ -594,7 +829,9 @@ def jugar_kahoot():
     running = True
     while running:
         tiempo_restante -= 1 / FPS
-
+        print(tiempo_restante)
+        if tiempo_restante < 0:
+            show_perdiste_screen()
         for event in pygame.event.get():
             manager.process_events(event)
             if event.type == pygame.QUIT:
@@ -667,7 +904,7 @@ def mostrar_pregunta_y_respuestas(ventana, manager, pregunta_actual, pregunta_te
         color = BLANCO  # Color predeterminado para las respuestas incorrectas
         if respuesta == respuesta_correcta:
             color = VERDE  # Cambia el color a verde si es la respuesta correcta
-        boton_respuesta = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((700, y_pos), (600, 50)),
+        boton_respuesta = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((400, y_pos), (600, 50)),
                                                        text=respuesta,
                                                        manager=manager)
         boton_respuesta.bg_color = color  # Establece el color de fondo del botón
@@ -690,17 +927,14 @@ def mostrar_respuesta_incorrecta(ventana, manager):
 
 # Define la función para reiniciar el juego
 def reiniciar_juego():
-    # Reinicia las variables del juego
-    cartas = imagenes_cargadas * 2
-    random.shuffle(cartas)
+        global nivel_actual, terminado
 
-    # Reinicia el estado de las cartas
-    for carta in tablero:
-        carta.visible = False
-        carta.matched = False
+        # Reinicia el nivel actual y el estado del juego
+        nivel_actual = 0
+        terminado = False
 
-    # Vuelve a iniciar el juego
-    main()
+        # Llama a la función principal del juego para iniciar un nuevo juego
+        main()
 
 
 def reiniciar_todo():
